@@ -1,0 +1,143 @@
+
+{
+  "entities": {
+    "Visitor": {
+      "title": "Visitante",
+      "description": "Registro de ingreso de un visitante al PH",
+      "type": "object",
+      "properties": {
+        "guardName": { "type": "string" },
+        "name": { "type": "string" },
+        "documentId": { "type": "string" },
+        "torre": { "type": "string" },
+        "apartamento": { "type": "string" },
+        "category": { "type": "string" },
+        "company": { "type": "string" },
+        "plate": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "checked-out"] },
+        "checkInTime": { "type": "string", "format": "date-time" },
+        "checkOutTime": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "documentId", "torre", "apartamento", "status", "checkInTime"]
+    },
+    "ScheduledVisit": {
+      "title": "Visita Programada",
+      "description": "Registro de una visita programada por un residente",
+      "type": "object",
+      "properties": {
+        "visitorName": { "type": "string" },
+        "residentName": { "type": "string" },
+        "torre": { "type": "string" },
+        "apartamento": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "time": { "type": "string" },
+        "visitType": { "type": "string" },
+        "details": { "type": "string" }
+      },
+      "required": ["visitorName", "residentName", "torre", "apartamento", "date", "time", "visitType"]
+    },
+    "Resident": {
+      "title": "Residente",
+      "description": "Perfil del residente registrado en el sistema",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "torre": { "type": "string" },
+        "apartamento": { "type": "string" },
+        "residentType": { "type": "string", "enum": ["PROPIETARIO", "INQUILINO"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "phone", "torre", "apartamento", "residentType"]
+    },
+    "BlackList": {
+      "title": "Lista Negra",
+      "description": "Registro de personas con acceso denegado por seguridad",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "documentId": { "type": "string" },
+        "reason": { "type": "string" },
+        "guardName": { "type": "string" },
+        "residentName": { "type": "string" },
+        "torre": { "type": "string" },
+        "apartamento": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "documentId", "reason", "guardName", "residentName", "torre", "apartamento"]
+    },
+    "Consigna": {
+      "title": "Consigna",
+      "description": "Orden operativa diaria",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "supervisor": { "type": "string" },
+        "priority": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Novedad": {
+      "title": "Novedad",
+      "description": "Reporte de incidencia o novedad",
+      "type": "object",
+      "properties": {
+        "guardName": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "priority": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "UserAccount": {
+      "title": "Cuenta de Usuario",
+      "description": "Perfil de usuario del sistema (Residente, Guardia, Admin)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "guardNumber": { "type": "string" },
+        "turno": { "type": "string", "enum": ["Diurno", "Nocturno"] },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "role": { "type": "string", "enum": ["residente", "guardia", "admin", "superadmin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "status", "role"]
+    }
+  },
+  "auth": {
+    "providers": ["google.com", "password"]
+  },
+  "firestore": {
+    "/visitas/{visitaId}": {
+      "schema": "Visitor",
+      "description": "Colección de todos los visitantes registrados"
+    },
+    "/previsitas/{previsitaId}": {
+      "schema": "ScheduledVisit",
+      "description": "Colección de visitas programadas por los residentes"
+    },
+    "/residentes/{residentId}": {
+      "schema": "Resident",
+      "description": "Colección de residentes registrados en el PH"
+    },
+    "/listanegra/{blacklistId}": {
+      "schema": "BlackList",
+      "description": "Registro de accesos prohibidos"
+    },
+    "/consignas/{consignaId}": {
+      "schema": "Consigna",
+      "description": "Órdenes operativas del personal"
+    },
+    "/novedades/{novedadId}": {
+      "schema": "Novedad",
+      "description": "Reportes de novedades en el PH"
+    },
+    "/usuarios/{userId}": {
+      "schema": "UserAccount",
+      "description": "Perfiles de usuarios y guardias del sistema"
+    }
+  }
+}

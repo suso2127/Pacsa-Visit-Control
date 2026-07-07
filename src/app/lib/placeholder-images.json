@@ -1,0 +1,35 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "hero-residence",
+      "description": "Aerial view of a modern luxury residential complex with clean architecture.",
+      "imageUrl": "https://picsum.photos/seed/pacsa1/1200/600",
+      "imageHint": "residential complex"
+    },
+    {
+      "id": "security-gate",
+      "description": "A modern security gate with electronic access control.",
+      "imageUrl": "https://picsum.photos/seed/pacsa2/800/400",
+      "imageHint": "security gate"
+    },
+    {
+      "id": "resident-avatar-1",
+      "description": "Avatar for a resident.",
+      "imageUrl": "https://picsum.photos/seed/pacsaperson1/100/100",
+      "imageHint": "profile person"
+    },
+    {
+      "id": "resident-avatar-2",
+      "description": "Avatar for another resident.",
+      "imageUrl": "https://picsum.photos/seed/pacsaperson2/100/100",
+      "imageHint": "profile person"
+    },
+    {
+      "id": "pacsa-logo",
+      "description": "PACSA Visit Control Logo",
+      "imageUrl": "https://picsum.photos/seed/logo-pacsa/600/400",
+      "imageHint": "security logo"
+    }
+  ]
+}
