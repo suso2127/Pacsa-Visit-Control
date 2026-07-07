@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { FirebaseProvider } from './provider';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { FirebaseProvider } from './provider';
 
 const firebaseConfig = {
   apiKey: "AIzaSyD9hts2UquaNJb41J7ZMZPPyYW8w8ur-mM",
