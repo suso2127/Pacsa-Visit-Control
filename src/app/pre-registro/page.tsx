@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -21,10 +20,10 @@ import {
   Calendar as CalendarIcon,
   Loader2,
   CreditCard,
-  FileText,
   Phone,
   ArrowRight,
-  ArrowLeft
+  ArrowLeft,
+  FileText
 } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { toast } from "@/hooks/use-toast"
@@ -134,7 +133,7 @@ export default function PreRegisterPage() {
       if (modifier === 'PM') hours += 12;
 
       const expirationDate = new Date(year, month - 1, day, hours, minutes);
-      expirationDate.setHours(expirationDate.getHours() + 2); // Expira 2 horas después
+      expirationDate.setHours(expirationDate.getHours() + 2);
       return expirationDate.toISOString();
     } catch (e) {
       return null;
@@ -210,6 +209,18 @@ export default function PreRegisterPage() {
     setResidentPhone("")
   }
 
+  const qrData = {
+    nombre: formData.name,
+    cedula: formData.documentId,
+    torre: formData.torre,
+    apartamento: formData.apartamento,
+    categoria: formData.visitType,
+    fecha: formData.date,
+    hora: formData.time,
+    expiracion: calculateExpirationTime(formData.date, formData.time) || ""
+  };
+  const qrValue = JSON.stringify(qrData);
+
   return (
     <DashboardLayout>
       <div className="max-w-md mx-auto space-y-6 animate-in fade-in duration-500 pb-10">
@@ -229,7 +240,7 @@ export default function PreRegisterPage() {
                   <ShieldCheck className="h-6 w-6" />
                 </div>
                 <h3 className="text-sm font-black uppercase text-indigo-950">Acceso Residente</h3>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase">INGRESE CON SU NUMERO DE TELEFONO</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase">INGRESE con su número de teléfono</p>
               </div>
 
               <form onSubmit={handleVerifyPhone} className="space-y-6">
@@ -449,7 +460,7 @@ export default function PreRegisterPage() {
             <div className="p-8 space-y-6 text-center">
               <div className="mx-auto w-[280px] h-[280px] bg-white rounded-3xl shadow-2xl flex items-center justify-center border-4 border-indigo-50 overflow-hidden">
                 <QRCodeSVG
-                  value={`PACSA|${formData.name}|${formData.documentId}|${formData.torre}-${formData.apartamento}|${formData.date}|${formData.time}`}
+                  value={qrValue}
                   size={256}
                   bgColor="#FFFFFF"
                   fgColor="#000000"

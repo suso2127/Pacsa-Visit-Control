@@ -33,7 +33,7 @@ import {
   Database,
   Camera
 } from "lucide-react"
-import { format, isAfter } from "date-fns"
+import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Label } from "@/components/ui/label"
 import { 
@@ -51,6 +51,7 @@ import { useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { errorEmitter } from "@/firebase/error-emitter"
 import { FirestorePermissionError } from "@/firebase/errors"
 import { Badge } from "@/components/ui/badge"
+import { Html5Qrcode } from "html5-qrcode"
 
 export default function GuardDashboard() {
   const db = useFirestore()
@@ -86,7 +87,9 @@ export default function GuardDashboard() {
   const [showPlateCamera, setShowPlateCamera] = React.useState(false)
   const [showSuccess, setShowSuccess] = React.useState(false)
   const [lastRegistered, setLastRegistered] = React.useState<any>(null)
-  const videoRef = React.useRef<HTMLVideoElement>(null)
+  
+  const qrScannerRef = React.useRef<Html5Qrcode | null>(null)
+  const barcodeScannerRef = React.useRef<Html5Qrcode | null>(null)
 
   React.useEffect(() => {
     const saved = localStorage.getItem('pacsa_guard_session')
@@ -102,31 +105,13 @@ export default function GuardDashboard() {
     }
   }, [])
 
-  const scheduledQuery = useMemoFirebase(() => {
-    if (!db) return null
-    return query(collection(db, "previsitas"), orderBy("createdAt", "desc"))
-  }, [db])
-
   const visitorsQuery = useMemoFirebase(() => {
     if (!db) return null
     return query(collection(db, "visitas"), orderBy("checkInTime", "desc"))
   }, [db])
 
-  const consignasQuery = useMemoFirebase(() => {
-    if (!db) return null
-    return query(collection(db, "consignas"), orderBy("createdAt", "desc"))
-  }, [db])
-
-  const blacklistQuery = useMemoFirebase(() => {
-    if (!db) return null
-    return query(collection(db, "listanegra"), orderBy("createdAt", "desc"))
-  }, [db])
-
-  const { data: scheduledVisits } = useCollection(scheduledQuery)
   const { data: visitors, loading: loadingVisitors } = useCollection(visitorsQuery)
-  const { data: consignas } = useCollection(consignasQuery)
-  const { data: blacklist } = useCollection(blacklistQuery)
-  
+
   const activeVisitors = React.useMemo(() => {
     return visitors?.filter(v => v.status === 'active') || []
   }, [visitors])
@@ -143,6 +128,117 @@ export default function GuardDashboard() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
+
+  React.useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    if (showScanner) {
+      timeoutId = setTimeout(async () => {
+        try {
+          const scannerElement = document.getElementById("qr-reader");
+          if (!scannerElement) return;
+
+          qrScannerRef.current = new Html5Qrcode("qr-reader")
+          await qrScannerRef.current.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            (decodedText) => {
+              try {
+                const data = JSON.parse(decodedText)
+                setFormData(prev => ({
+                  ...prev,
+                  name: (data.nombre || "").toUpperCase(),
+                  documentId: (data.cedula || "").toUpperCase(),
+                  torre: (data.torre || "").toUpperCase(),
+                  apartamento: (data.apartamento || "").toUpperCase(),
+                  category: (data.categoria || "VISITAS").toUpperCase()
+                }))
+                toast({ title: "Pase Digital Leído", description: "Datos autocompletados con éxito." })
+                handleStopScanner(qrScannerRef)
+                setShowScanner(false)
+              } catch (e) {
+                handleLegacyScan(decodedText)
+              }
+            },
+            () => {}
+          )
+        } catch (err) {
+          console.error("Error al iniciar scanner QR:", err)
+          toast({ variant: "destructive", title: "Error de Cámara", description: "No se pudo acceder a la cámara o el contenedor no está listo." })
+        }
+      }, 150)
+    } else {
+      handleStopScanner(qrScannerRef)
+    }
+    return () => {
+      clearTimeout(timeoutId)
+      handleStopScanner(qrScannerRef)
+    }
+  }, [showScanner])
+
+  React.useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    if (showBarcodeScanner) {
+      timeoutId = setTimeout(async () => {
+        try {
+          const scannerElement = document.getElementById("barcode-reader");
+          if (!scannerElement) return;
+
+          barcodeScannerRef.current = new Html5Qrcode("barcode-reader")
+          await barcodeScannerRef.current.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 300, height: 150 } },
+            (decodedText) => {
+              setFormData(prev => ({
+                ...prev,
+                documentId: decodedText.toUpperCase()
+              }))
+              toast({ title: "ID Escaneado", description: "Cédula registrada en el formulario." })
+              handleStopScanner(barcodeScannerRef)
+              setShowBarcodeScanner(false)
+            },
+            () => {}
+          )
+        } catch (err) {
+          console.error("Error al iniciar scanner Barcode:", err)
+          toast({ variant: "destructive", title: "Error de Cámara", description: "No se pudo acceder a la cámara o el contenedor no está listo." })
+        }
+      }, 150)
+    } else {
+      handleStopScanner(barcodeScannerRef)
+    }
+    return () => {
+      clearTimeout(timeoutId)
+      handleStopScanner(barcodeScannerRef)
+    }
+  }, [showBarcodeScanner])
+
+  const handleStopScanner = (ref: React.MutableRefObject<Html5Qrcode | null>) => {
+    if (ref.current && ref.current.isScanning) {
+      ref.current.stop().then(() => {
+        ref.current?.clear()
+        ref.current = null
+      }).catch(err => console.error("Error deteniendo scanner:", err))
+    }
+  }
+
+  const handleLegacyScan = async (id: string) => {
+    if (!db) return
+    const q = query(collection(db, "previsitas"), orderBy("createdAt", "desc"), limit(1))
+    const snapshot = await getDocs(q)
+    if (!snapshot.empty) {
+      const visitData = snapshot.docs[0].data()
+      setFormData(prev => ({
+        ...prev,
+        name: (visitData.visitorName || "").toUpperCase(),
+        documentId: (visitData.visitorId || "").toUpperCase(),
+        torre: (visitData.torre || "").toUpperCase(),
+        apartamento: (visitData.apartamento || "").toUpperCase(),
+        category: (visitData.visitType || "VISITAS").toUpperCase()
+      }))
+      toast({ title: "Buscando Pre-Registro", description: "Datos encontrados por correlación." })
+      setShowScanner(false)
+    }
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -248,97 +344,22 @@ export default function GuardDashboard() {
     })
   }
 
-  const handleScanQR = async () => {
-    if (!db) return
-    setIsReading(true)
-    
-    try {
-      const q = query(collection(db, "previsitas"), orderBy("createdAt", "desc"), limit(1))
-      const querySnapshot = await getDocs(q)
-      
-      if (!querySnapshot.empty) {
-        const visitData = querySnapshot.docs[0].data()
-        
-        if (visitData.fechaExpiracion) {
-          const expDate = new Date(visitData.fechaExpiracion);
-          if (isAfter(new Date(), expDate)) {
-            toast({
-              variant: "destructive",
-              title: "PASE EXPIRADO",
-              description: "ACCESO DENEGADO - El pase ya no es válido.",
-            });
-            setShowScanner(false);
-            return;
-          }
-        }
-
-        setFormData(prev => ({
-          ...prev,
-          name: (visitData.visitorName || "").toUpperCase(),
-          documentId: (visitData.visitorId || "").toUpperCase(),
-          torre: (visitData.torre || "").toUpperCase(),
-          apartamento: (visitData.apartamento || "").toUpperCase(),
-          category: (visitData.visitType || "VISITAS").toUpperCase(),
-          company: (visitData.company || "").toUpperCase(),
-          plate: ""
-        }))
-        
-        toast({
-          title: "Código Validado",
-          description: "Datos del pre-registro cargados automáticamente.",
-        })
-        setShowScanner(false)
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Código Inválido",
-          description: "No se encontró un pre-registro asociado a este código.",
-        });
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error de Lectura",
-        description: "No se pudo procesar el código.",
-      })
-    } finally {
-      setIsReading(false)
-    }
-  }
-
   const handleCapturePlatePhoto = () => {
     setIsCapturingPlate(true)
-    // Simulación de captura de foto
     setTimeout(() => {
       const simulatedPlate = "ABC-" + Math.floor(Math.random() * 9999);
       setFormData(prev => ({
         ...prev,
         plate: simulatedPlate,
-        platePhoto: "data:image/jpeg;base64,..." // Simulación de URI
+        platePhoto: "data:image/jpeg;base64,..."
       }))
       setIsCapturingPlate(false)
       setShowPlateCamera(false)
       toast({
-        title: "Foto Capturada",
-        description: `Placa ${simulatedPlate} registrada correctamente.`,
+        title: "Placa Capturada",
+        description: `Matrícula ${simulatedPlate} registrada visualmente.`,
       })
     }, 1500)
-  }
-
-  const simulateBarcodeScan = () => {
-    const simulatedID = "8-" + Math.floor(Math.random() * 999) + "-" + Math.floor(Math.random() * 9999);
-    const simulatedName = "JUAN CARLOS PÉREZ (DATO LEÍDO)";
-    
-    setFormData(prev => ({
-      ...prev,
-      name: simulatedName.toUpperCase(),
-      documentId: simulatedID.toUpperCase(),
-    }))
-    setShowBarcodeScanner(false)
-    toast({
-      title: "Documento Leído",
-      description: "Información extraída de la cédula con éxito.",
-    })
   }
 
   const toggleSound = () => {
@@ -457,9 +478,6 @@ export default function GuardDashboard() {
             >
               <LogOut className="h-5 w-5" />
             </Button>
-            <div className="h-10 w-10 rounded-full border-2 border-primary/20 p-0.5">
-              <img src="https://picsum.photos/seed/guard1/100/100" alt="Guard" className="rounded-full h-full w-full object-cover" />
-            </div>
           </div>
         </div>
 
@@ -486,13 +504,13 @@ export default function GuardDashboard() {
               <div className="text-center space-y-1">
                 <p className="text-[10px] font-black text-red-600 uppercase tracking-tighter">Programadas</p>
                 <div className="bg-red-500/10 rounded-lg py-2">
-                  <p className="text-[10px] font-black text-white">{scheduledVisits?.length || 0}</p>
+                  <p className="text-[10px] font-black text-white">{visitors?.length || 0}</p>
                 </div>
               </div>
               <div className="text-center space-y-1">
                 <p className="text-[10px] font-black text-red-600 uppercase tracking-tighter">Consignas</p>
                 <div className="bg-red-500/10 rounded-lg py-2">
-                  <p className="text-[10px] font-black text-white">{consignas?.length || 0}</p>
+                  <p className="text-[10px] font-black text-white">0</p>
                 </div>
               </div>
               <div className="text-center space-y-1">
@@ -504,7 +522,7 @@ export default function GuardDashboard() {
               <div className="text-center space-y-1">
                 <p className="text-[10px] font-black text-red-600 uppercase tracking-tighter">Lista Negra</p>
                 <div className="bg-red-500/10 rounded-lg py-2">
-                  <p className="text-[10px] font-black text-white">{blacklist?.length || 0}</p>
+                  <p className="text-[10px] font-black text-white">0</p>
                 </div>
               </div>
             </div>
@@ -528,20 +546,18 @@ export default function GuardDashboard() {
                   <DialogHeader>
                     <DialogTitle className="text-lg font-black uppercase tracking-widest text-white">Escáner PACSA</DialogTitle>
                   </DialogHeader>
-                  <p className="text-[10px] text-indigo-300 font-bold uppercase mt-1">Sincronizando con base de datos...</p>
+                  <p className="text-[10px] text-indigo-300 font-bold uppercase mt-1">Apunte la cámara al código QR</p>
                 </div>
                 <div className="p-6 space-y-4">
                   <div className="aspect-square w-full bg-black rounded-2xl relative overflow-hidden ring-4 ring-indigo-500/10">
-                    <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
-                    <div className="absolute inset-x-10 top-1/2 h-0.5 bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.8)] animate-pulse" />
+                    <div id="qr-reader" className="w-full h-full"></div>
+                    <div className="absolute inset-x-10 top-1/2 h-0.5 bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.8)] animate-pulse pointer-events-none" />
                   </div>
                   <Button 
-                    onClick={handleScanQR} 
-                    disabled={isReading}
+                    onClick={() => setShowScanner(false)} 
                     className="w-full h-14 bg-indigo-900 text-white font-black text-xs uppercase tracking-widest rounded-xl"
                   >
-                    {isReading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Scan className="mr-2 h-4 w-4" />}
-                    {isReading ? "LEYENDO..." : "SIMULAR LECTURA QR"}
+                    CANCELAR LECTURA
                   </Button>
                 </div>
               </DialogContent>
@@ -563,15 +579,15 @@ export default function GuardDashboard() {
                   <DialogHeader>
                     <DialogTitle className="text-lg font-black uppercase tracking-widest text-white">Lector Documentos</DialogTitle>
                   </DialogHeader>
-                  <p className="text-[10px] text-emerald-200 font-bold uppercase mt-1">Extracción rápida de datos</p>
+                  <p className="text-[10px] text-emerald-200 font-bold uppercase mt-1">Escanee el código de barras</p>
                 </div>
                 <div className="p-6 space-y-4">
                   <div className="aspect-[16/9] w-full bg-black rounded-2xl relative overflow-hidden ring-4 ring-emerald-500/10">
-                    <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
-                    <div className="absolute inset-x-0 top-1/2 h-0.5 bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)] animate-pulse" />
+                    <div id="barcode-reader" className="w-full h-full"></div>
+                    <div className="absolute inset-x-0 top-1/2 h-0.5 bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)] animate-pulse pointer-events-none" />
                   </div>
-                  <Button onClick={simulateBarcodeScan} className="w-full h-14 bg-emerald-900 text-white font-black text-xs uppercase tracking-widest rounded-xl">
-                    <ScanBarcode className="mr-2 h-4 w-4" /> SIMULAR LECTURA CÉDULA
+                  <Button onClick={() => setShowBarcodeScanner(false)} className="w-full h-14 bg-emerald-900 text-white font-black text-xs uppercase tracking-widest rounded-xl">
+                    CANCELAR LECTURA
                   </Button>
                 </div>
               </DialogContent>
@@ -705,8 +721,8 @@ export default function GuardDashboard() {
                           </div>
                           <div className="p-6 space-y-4">
                             <div className="aspect-[4/3] w-full bg-black rounded-2xl relative overflow-hidden ring-4 ring-indigo-500/10">
-                              <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
-                              <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 h-20 border-2 border-indigo-400 border-dashed rounded-lg flex items-center justify-center">
+                              <div id="plate-reader" className="w-full h-full"></div>
+                              <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 h-20 border-2 border-indigo-400 border-dashed rounded-lg flex items-center justify-center pointer-events-none">
                                 <p className="text-[8px] text-indigo-400 font-black uppercase">ALINEAR PLACA AQUÍ</p>
                               </div>
                             </div>
