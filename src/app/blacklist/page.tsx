@@ -1,6 +1,6 @@
-
 "use client"
 
+import { Suspense } from "react"
 import * as React from "react"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -37,7 +37,7 @@ import { es } from "date-fns/locale"
 import { errorEmitter } from "@/firebase/error-emitter"
 import { FirestorePermissionError } from "@/firebase/errors"
 
-export default function BlackListPage() {
+function BlacklistContent() {
   const db = useFirestore()
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [searchTerm, setSearchTerm] = React.useState("")
@@ -370,5 +370,24 @@ export default function BlackListPage() {
         </div>
       </div>
     </DashboardLayout>
+  )
+}
+
+export default function BlackListPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#F0F5FF] flex flex-col justify-center items-center p-4">
+        <div className="space-y-4 text-center animate-pulse">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-900 text-white shadow-lg">
+            <div className="h-6 w-6 border-4 border-t-transparent border-white rounded-full animate-spin" />
+          </div>
+          <p className="text-[10px] text-indigo-900/60 font-black uppercase tracking-[0.3em]">
+            Cargando Lista Negra...
+          </p>
+        </div>
+      </div>
+    }>
+      <BlacklistContent />
+    </Suspense>
   )
 }
