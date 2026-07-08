@@ -1,7 +1,7 @@
-
 "use client"
 
 import * as React from "react"
+import { Suspense } from "react"
 import DashboardLayout from "@/components/dashboard-layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -24,7 +24,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth"
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 
-export default function AdminDashboardPage() {
+function AdminDashboardContent() {
   const auth = useAuth()
   const db = useFirestore()
   const [isSeeding, setIsSeeding] = React.useState(false)
@@ -63,8 +63,6 @@ export default function AdminDashboardPage() {
       } catch (error: any) {
         if (error.code === 'auth/email-already-in-use') {
           console.log(`Usuario ${u.email} ya existe en Auth.`);
-          // Intentamos crear el documento de todas formas por si falta
-          // Nota: Aquí necesitaríamos el UID del usuario existente, pero Auth cliente no lo da sin login
         } else {
           console.error(`Error creando ${u.email}:`, error)
           errorsCount++
@@ -237,5 +235,13 @@ export default function AdminDashboardPage() {
         </div>
       </div>
     </DashboardLayout>
+  )
+}
+
+export default function AdminDashboardPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-indigo-900" /></div>}>
+      <AdminDashboardContent />
+    </Suspense>
   )
 }
